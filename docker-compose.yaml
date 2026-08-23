@@ -1,0 +1,26 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: expense-tracker-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_only}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-expense_tracker}
+      MYSQL_USER: ${MYSQL_USER:-expense_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-expense_app_dev_only}
+    ports:
+      - "3306:3306"
+    volumes:
+      - expense-tracker-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_dev_only}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  expense-tracker-mysql-data:
+
+# Dev-only credentials with fallback defaults so `docker compose up` works out of the box.
+# Never reuse these values anywhere near production - inject real secrets via env vars
+# or a .env file (gitignored) instead.

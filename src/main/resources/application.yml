@@ -1,0 +1,85 @@
+spring:
+  application:
+    name: expenseTracker
+  # No profile is "correct" by accident - if nothing is set explicitly via
+  # SPRING_PROFILES_ACTIVE, we fall back to dev rather than prod. Getting this
+  # backwards (defaulting to prod-shaped config) is the more dangerous mistake.
+  profiles:
+    default: dev
+
+  jpa:
+    # Flyway owns the schema - Hibernate should only validate, never auto-generate DDL.
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# Property paths (jwt.access.expiration, jwt.refresh.expiration, jwt.secret)
+# match the FDS v1.2 / Dev Task Tracker naming exactly - D3-02's acceptance
+# criteria checks for these literal paths. Values use Spring Boot's Duration
+# shorthand (15m, 7d) - bound automatically to java.time.Duration fields via
+# the ApplicationConversionService, no manual parsing needed in JwtUtil.
+jwt:
+  access:
+    expiration: ${JWT_ACCESS_EXPIRATION:15m}
+  refresh:
+    expiration: ${JWT_REFRESH_EXPIRATION:7d}
+  # secret is deliberately NOT set here - see the dev/prod blocks below. It
+  # has no safe cross-environment default.
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+logging:
+  level:
+    root: INFO
+    com.expenseTracker: DEBUG
+    org.hibernate.SQL: WARN
+
+---
+# --- dev profile: local docker-compose MySQL, working defaults so the app runs
+# out of the box with `mvn spring-boot:run` after `docker compose up -d`.
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:expense_tracker}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USER:expense_app}
+    password: ${DB_PASSWORD:expense_app_dev_only}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+jwt:
+  secret: ${JWT_SECRET:CHANGE_ME_dev_only_placeholder_secret_key_min_32_bytes}
+
+---
+# --- prod profile: every credential is required with NO fallback. A missing
+# env var here fails application startup immediately (Spring throws on an
+# unresolvable ${...} placeholder) instead of silently booting with dev
+# creds or an unencrypted DB connection. TLS is mandatory.
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=true&requireSSL=true&serverTimezone=UTC
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+jwt:
+  secret: ${JWT_SECRET}
