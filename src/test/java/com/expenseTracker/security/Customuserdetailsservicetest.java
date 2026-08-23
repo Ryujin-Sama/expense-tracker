@@ -64,6 +64,7 @@ import static org.mockito.Mockito.when;
  * @see com.expenseTracker.security.UserPrincipal
  * @see org.springframework.security.core.userdetails.UserDetailsService
  */
+@ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
 
     @Mock
