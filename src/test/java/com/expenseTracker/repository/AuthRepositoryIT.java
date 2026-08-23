@@ -19,15 +19,91 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Runs the real V1/V2 Flyway migrations against a throwaway MySQL container
- * and exercises both repositories against them. Exists to catch
- * entity/schema drift (a renamed column, a dropped constraint, a
- * misconfigured FK) at build time instead of at Day 4 when AuthService
- * starts writing real rows.
- *
- * replace = Replace.NONE is required - by default @DataJpaTest swaps in an
- * embedded H2 database, which would silently skip the MySQL-specific
- * migrations (ON UPDATE CURRENT_TIMESTAMP, the FK CASCADE) entirely.
+ * Integration tests for User and RefreshToken repositories.
+ * 
+ * Test Type: Integration Tests (IT)
+ * These tests run against a REAL database (MySQL in a container), not an in-memory H2.
+ * They verify that:
+ * - Flyway migrations execute correctly
+ * - Entity mappings match the database schema
+ * - JPA queries generate correct SQL
+ * - Database constraints are enforced
+ * - Cascade delete and foreign keys work as expected
+ * 
+ * Why Use a Real Database?
+ * Default @DataJpaTest uses embedded H2 database which:
+ * - Silently skips MySQL-specific migrations (ON UPDATE CURRENT_TIMESTAMP, etc.)
+ * - Supports different SQL syntax than MySQL
+ * - Misses constraint issues until production
+ * - Allows tests to pass that would fail in production
+ * 
+ * TestContainers Solution:
+ * - Spawns a real MySQL 8.4 container for each test run
+ * - Runs Flyway migrations against this container
+ * - Verifies all migration syntax and constraints
+ * - Cleans up container after tests complete
+ * - Isolates tests from each other (fresh database per test class)
+ * 
+ * Test Configuration:
+ * - @DataJpaTest: Loads Spring Data JPA configuration + repositories
+ * - @Testcontainers: Enables TestContainers framework
+ * - @AutoConfigureTestDatabase(replace = NONE): Use real DB, don't replace with H2
+ * - @Container: Static MySQL container instance
+ * - @DynamicPropertySource: Inject container connection details into Spring
+ * 
+ * Test Coverage:
+ * 
+ * 1. User Entity & Repository:
+ *    - User can be saved and retrieved
+ *    - Email unique constraint is enforced
+ *    - Duplicate email throws DataIntegrityViolationException
+ *    - existsByEmail() works for both existing and non-existing emails
+ *    - createdAt timestamp is automatically set
+ * 
+ * 2. RefreshToken Entity & Repository:
+ *    - Cascade delete works (user deleted -> tokens deleted)
+ *    - Bulk revocation only affects target user's tokens
+ *    - Bulk revocation returns correct count
+ *    - Revocation flag is correctly persisted
+ *    - Already-revoked tokens are not re-revoked
+ * 
+ * 3. Token Expiry Logic:
+ *    - isExpired(Instant) correctly evaluates expiration
+ *    - isUsable(Instant) combines revocation + expiration checks
+ *    - Both methods work with fixed test Instants (deterministic)
+ * 
+ * Important Flyway Migrations Tested:
+ * - V1__init_Users_Table.sql
+ * - V2__Init_Refresh_Tokens_Table.sql
+ * 
+ * These migrations are applied automatically at test startup.
+ * If migration syntax is wrong or incompatible, tests fail immediately.
+ * 
+ * Performance Considerations:
+ * - Full container startup takes ~5-10 seconds per test class
+ * - Acceptable for CI/CD validation
+ * - Not suitable for "watch mode" rapid feedback
+ * - Can be skipped locally with -Dskip.docker=true if needed
+ * 
+ * Debugging Failed Tests:
+ * If tests fail:
+ * 1. Check migration SQL syntax (Flyway errors are detailed)
+ * 2. Verify entity annotations match database schema
+ * 3. Check database constraint definitions
+ * 4. Look at MySQL container logs (Docker logs)
+ * 5. Ensure LocalDateTime vs Instant field types match
+ * 
+ * Test Isolation:
+ * - Each test runs in its own transaction
+ * - @Transactional(readOnly=true) rolls back after test
+ * - No data persists between tests
+ * - Multiple tests can run in parallel safely
+ * - Database is isolated from other test classes
+ * 
+ * @see com.expenseTracker.repository.UserRepository
+ * @see com.expenseTracker.repository.RefreshTokenRepository
+ * @see com.expenseTracker.model.entity.User
+ * @see com.expenseTracker.model.entity.RefreshToken
  */
 @DataJpaTest
 @Testcontainers

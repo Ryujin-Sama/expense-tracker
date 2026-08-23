@@ -12,6 +12,66 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
+/**
+ * User entity representing a registered user in the Expense Tracker system.
+ * 
+ * JPA Entity Mapping:
+ * - Table Name: "users"
+ * - Primary Key: id (auto-generated IDENTITY)
+ * - Email: Unique constraint enforced at database level
+ * 
+ * User Attributes:
+ * - id: Auto-generated primary key
+ * - email: User's unique email address (username for login)
+ * - passwordHash: BCrypt-hashed password (never stored plain)
+ * - firstName: User's first name
+ * - lastName: User's last name
+ * - baseCurrency: Preferred currency for expense tracking (defaults to USD)
+ * - role: Authorization role - ROLE_USER (default) or ROLE_ADMIN
+ * - createdAt: Timestamp of account creation (set automatically via @PrePersist)
+ * 
+ * Security Design:
+ * - Password is stored as BCrypt hash ONLY - never plain text
+ * - The entity never performs hashing - it only stores pre-hashed values
+ * - BCrypt hashing is the responsibility of AuthService (encapsulation)
+ * - Email is unique at database level (unique constraint)
+ * 
+ * Role-Based Access Control:
+ * - ROLE_USER: Regular user who can manage their own expenses
+ * - ROLE_ADMIN: Administrator with elevated privileges
+ * - New registrations always default to ROLE_USER
+ * - Role elevation only happens via administrative endpoints (not yet implemented)
+ * 
+ * Database Constraints:
+ * - email: NOT NULL, UNIQUE, length 255
+ * - password_hash: NOT NULL, length 255 (BCrypt produces 60-character hashes)
+ * - first_name: NOT NULL, length 100
+ * - last_name: NOT NULL, length 100
+ * - base_currency: NOT NULL, length 3, default 'USD'
+ * - role: NOT NULL, length 50, stored as ENUM string
+ * - created_at: NOT NULL, IMMUTABLE (never updated, set only on insert)
+ * 
+ * Entity Lifecycle:
+ * - Construction: Use constructor with required fields + optional baseCurrency
+ * - Persistence: Call userRepository.save(user)
+ * - onCreate() hook: @PrePersist automatically sets createdAt timestamp
+ * - Retrieval: Use userRepository.findByEmail() or findById()
+ * - Updates: Modify entity, call repository.save() or just let transaction commit
+ * 
+ * Equality & Hashing:
+ * - Compared by database ID only (id-based equality)
+ * - Transient objects (not yet persisted) are never equal
+ * - toString() deliberately excludes passwordHash for security
+ * 
+ * Related Entities:
+ * - RefreshToken: One-to-Many relationship (one user can have multiple refresh tokens)
+ * - One user can have multiple expenses (not yet modeled in Sprint 1)
+ * 
+ * @see com.expenseTracker.model.entity.RefreshToken
+ * @see com.expenseTracker.model.entity.Role
+ * @see com.expenseTracker.model.dto.RegisterRequest
+ * @see com.expenseTracker.model.dto.AuthResponse
+ */
 @Entity
 @Table(name = "users")
 public class User {

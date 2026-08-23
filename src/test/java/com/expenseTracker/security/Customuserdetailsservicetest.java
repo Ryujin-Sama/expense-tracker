@@ -17,13 +17,53 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 /**
- * Pure unit test - UserRepository is mocked, no Spring context, no DB.
- * This is a lightweight smoke test to de-risk today's work, not the
- * comprehensive AuthService/JwtUtil/RefreshTokenService suite the tracker
- * schedules for Day 11 - that pass should add the edge cases this doesn't
- * cover (e.g. disabled/locked accounts, once those states exist).
+ * Unit tests for CustomUserDetailsService (Spring Security UserDetailsService).
+ * 
+ * Test Scope:
+ * This is a pure unit test using mocking:
+ * - UserRepository is mocked (no real database)
+ * - No Spring context needed
+ * - No database connections
+ * - Tests only the UserDetailsService logic
+ * 
+ * Why Mock the Repository?
+ * - Focus on CustomUserDetailsService behavior in isolation
+ * - Tests don't depend on database state
+ * - Tests run fast (no I/O)
+ * - Tests are deterministic and reproducible
+ * - Can easily test both success and failure paths
+ * 
+ * Test Coverage (Current - Sprint 1):
+ * - Successful user loading and role mapping
+ * - Exception thrown when user not found
+ * - UserPrincipal correctly created from User entity
+ * - Authorities list correctly populated with role
+ * 
+ * NOT Covered (Future Sprints):
+ * - Account lockout/expiration handling (when those features exist)
+ * - Disabled account handling (when soft-delete is implemented)
+ * - Password expiration handling (when password policy is added)
+ * - Multi-tenant scenarios (if application becomes multi-tenant)
+ * - Performance/concurrent loading (load testing)
+ * 
+ * Critical Note - UsernameNotFoundException:
+ * This test verifies that UsernameNotFoundException is thrown when user not found.
+ * HOWEVER, this exception MUST NOT reach the client as a distinct error!
+ * 
+ * GlobalExceptionHandler (to be implemented in Sprint 4) must catch this and
+ * return generic "Invalid email or password" to prevent user enumeration attacks.
+ * This test only verifies the exception is thrown, not how it's handled.
+ * 
+ * Test Implementation Details:
+ * - User is created as a transient entity (not persisted, no ID)
+ * - Mockito.when() sets up mock behavior
+ * - UserPrincipal.fromUser() is called by the service
+ * - Assertions verify both UserDetails contract and role mapping
+ * 
+ * @see com.expenseTracker.security.CustomUserDetailsService
+ * @see com.expenseTracker.security.UserPrincipal
+ * @see org.springframework.security.core.userdetails.UserDetailsService
  */
-@ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
 
     @Mock

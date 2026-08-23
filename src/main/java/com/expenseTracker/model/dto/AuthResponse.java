@@ -3,12 +3,49 @@ package com.expenseTracker.model.dto;
 import com.expenseTracker.model.entity.User;
 
 /**
- * Deliberately carries no token fields. Under the cookie-based auth model
- * (httpOnly, Secure, SameSite=Strict), both tokens travel exclusively via
- * Set-Cookie headers set by AuthController (Day 4/5) - never in the JSON
- * response body. Putting the token here as well as in a cookie would
- * partially defeat the reason for choosing httpOnly cookies in the first
- * place: keeping the token out of reach of JavaScript (and therefore XSS).
+ * Data Transfer Object (DTO) for authentication responses.
+ * 
+ * This class represents the data returned to the client after successful authentication.
+ * It contains user profile information but intentionally DOES NOT include authentication tokens.
+ * 
+ * Design Decision - No Token Fields:
+ * This class deliberately carries NO token fields (accessToken, refreshToken, etc.).
+ * 
+ * Why? Under the httpOnly cookie-based auth model (Secure, SameSite=Strict):
+ * - Tokens travel EXCLUSIVELY via Set-Cookie HTTP headers
+ * - Tokens never appear in the JSON response body
+ * - This keeps tokens out of reach of JavaScript code (preventing XSS attacks)
+ * - Putting tokens in both cookies AND JSON response would:
+ *   * Expose tokens to JavaScript via JSON parsing
+ *   * Partially defeat the entire reason for choosing httpOnly cookies
+ *   * Create two sources of truth for the same token
+ *   * Increase surface area for security vulnerabilities
+ * 
+ * Token Flow (Sprint 1):
+ * - Client sends credentials via POST /api/auth/login (AuthRequest)
+ * - AuthService validates credentials
+ * - AuthController generates tokens via JwtUtil
+ * - AuthController sets tokens in response headers (Set-Cookie)
+ * - Client receives AuthResponse with user data
+ * - Client receives tokens in cookies (automatic browser handling)
+ * - Subsequent requests include token via cookie (automatic browser handling)
+ * 
+ * Fields Included:
+ * - id: User's unique database identifier
+ * - email: User's email address (username)
+ * - firstName: User's first name
+ * - lastName: User's last name
+ * - baseCurrency: User's preferred currency for expense tracking (e.g., USD)
+ * - role: User's authorization role (ROLE_USER or ROLE_ADMIN)
+ * 
+ * Usage:
+ * - Returned by POST /api/auth/login on successful authentication
+ * - Returned by POST /api/auth/register on successful account creation
+ * - Client displays user info in UI
+ * - Client uses role to determine available features
+ * 
+ * @see com.expenseTracker.model.entity.User
+ * @see com.expenseTracker.security.JwtUtil
  */
 public class AuthResponse {
 

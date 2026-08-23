@@ -17,13 +17,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Pure unit test - JwtUtil is instantiated directly with a test secret, no
- * Spring context needed. This is the highest-value test in today's batch:
- * jjwt's builder/parser API changed shape across 0.11 -> 0.12 -> 0.13, so a
- * silent method-signature mismatch is exactly the kind of thing that looks
- * fine at compile time and breaks at runtime. Lightweight smoke coverage,
- * not the full Day 11 suite - no coverage here yet for clock-skew tolerance
- * or malformed-token shapes beyond a bad signature.
+ * Unit tests for JwtUtil (JWT token generation and validation).
+ * 
+ * Test Scope:
+ * This is a pure unit test - JwtUtil is instantiated directly with a test secret.
+ * No Spring context is needed, no database access, no mocking required.
+ * This makes tests fast and focused on JwtUtil logic only.
+ * 
+ * Why This Test Matters:
+ * - JwtUtil uses the JJWT library which has evolved significantly
+ * - Method signatures changed between versions 0.11 -> 0.12 -> 0.13
+ * - Silent compilation errors are possible (different method signatures look right but fail at runtime)
+ * - These smoke tests catch integration issues early
+ * - Verifies tokens round-trip correctly (generate -> parse -> extract)
+ * 
+ * Test Coverage (Current - Sprint 1):
+ * - Token generation with all claims
+ * - Token validation with correct secret
+ * - Token rejection with different secret (signature mismatch)
+ * - Token rejection when already expired
+ * - Token rejection when malformed
+ * - Unrecognized role claim handling
+ * 
+ * NOT Covered (Future Sprints):
+ * - Clock skew tolerance (tokens slightly before/after expiration)
+ * - Token refresh timing and edge cases
+ * - Key rotation scenarios
+ * - Algorithm negotiation attacks
+ * - Comprehensive malformed token shapes
+ * - Performance/benchmarking tests
+ * 
+ * Test Strategy:
+ * - No Thread.sleep() needed (use Duration.ofSeconds(-1) for expired tokens)
+ * - All test data is deterministic and reproducible
+ * - Each test is independent (no shared state)
+ * - Tests use fixed Instant values where needed
+ * - Secrets are static (same value in all tests for signing/verification)
+ * 
+ * @see com.expenseTracker.security.JwtUtil
  */
 class JwtUtilTest {
 

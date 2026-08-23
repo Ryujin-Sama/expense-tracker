@@ -13,6 +13,77 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
+/**
+ * Refresh token entity for implementing token rotation and revocation.
+ * 
+ * This entity stores hashed refresh tokens that can be revoked without requiring
+ * clients to immediately log in again. Refresh tokens are long-lived (7 days),
+ * whereas access tokens are short-lived (15 minutes).
+ * 
+ * Design Principles:
+ * - Tokens are NEVER stored in plain text (always hashed with SHA-256)
+ * - Token revocation is database-backed (unlike JWT which is stateless)
+ * - Tokens can be individually revoked or bulk-revoked (e.g., on password change)
+ * - Lazy-loading User relationship (we rarely need full user data for token validation)
+ * 
+ * JPA Entity Mapping:
+ * - Table Name: "refresh_tokens"
+ * - Primary Key: id (auto-generated IDENTITY)
+ * - Foreign Key: user_id (references users.id, cascading delete)
+ * 
+ * Attributes:
+ * - id: Auto-generated primary key
+ * - user: Lazy-loaded reference to the User who owns this token
+ * - tokenHash: SHA-256 hash of the raw opaque token (128-character hex string)
+ * - expiresAt: Timestamp when token becomes invalid (default 7 days from creation)
+ * - revoked: Flag indicating if token has been explicitly revoked (false = active)
+ * - createdAt: Timestamp of token creation (set automatically via @PrePersist)
+ * 
+ * Database Columns (and Java Mapping):
+ * - user_id: Foreign key to users.id (NOT NULL, CASCADE DELETE)
+ * - token_hash: Unique hash (NOT NULL, UNIQUE, length 255)
+ * - expiry_date: Expiration timestamp (NOT NULL)
+ * - is_revoked: Revocation flag (NOT NULL, default false)
+ * - created_at: Creation timestamp (NOT NULL, IMMUTABLE)
+ * 
+ * Token Validation Logic:
+ * A refresh token is usable if and only if:
+ * 1. is_revoked = false (not explicitly revoked)
+ * 2. expiry_date > now() (not yet expired)
+ * 
+ * Methods:
+ * - isExpired(Instant now): Check if token has passed its expiration time
+ * - isUsable(Instant now): Check if token is both not revoked AND not expired
+ * - isExpired(): Convenience method using Instant.now()
+ * - isUsable(): Convenience method using Instant.now()
+ * 
+ * Revocation Scenarios (Sprint 1):
+ * - User explicitly logs out
+ * - Password is changed (all existing refresh tokens revoked)
+ * - User's account is disabled/deleted
+ * - Admin revokes user's sessions
+ * 
+ * Token Flow:
+ * 1. User logs in successfully
+ * 2. AuthService generates opaque random token (e.g., 64-byte random)
+ * 3. SHA-256 hash is computed and stored in token_hash column
+ * 4. Raw token is returned to client (in httpOnly cookie)
+ * 5. Client includes cookie in requests automatically
+ * 6. Server validates token hash against stored hash
+ * 7. If still usable, server issues new access token
+ * 8. Process repeats until refresh token expires or is revoked
+ * 
+ * Security Notes:
+ * - Raw token is never persisted (only hash)
+ * - If database is breached, attacker cannot use stolen token hashes
+ * - Tokens are bound to specific users (via user_id foreign key)
+ * - Cascading delete: removing a user also removes their tokens
+ * - Test data uses fixed Instant values, but production uses Instant.now()
+ * 
+ * @see com.expenseTracker.model.entity.User
+ * @see com.expenseTracker.security.JwtUtil
+ * @see com.expenseTracker.repository.RefreshTokenRepository
+ */
 @Entity
 @Table(name = "refresh_tokens")
 public class RefreshToken {

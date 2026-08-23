@@ -5,12 +5,31 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Login request. Deliberately no password complexity validation here (unlike
- * RegisterRequest) - the policy is enforced once, at registration. At login,
- * a wrong password should just fail authentication generically; validating
- * complexity here would let an attacker distinguish "malformed" from
- * "wrong" and would reject legitimate old passwords if the policy tightens
- * later.
+ * Data Transfer Object (DTO) for user login requests.
+ * 
+ * This class captures the credentials needed for user authentication via the login endpoint.
+ * It contains email and password fields with validation constraints to ensure data integrity.
+ * 
+ * Security Considerations:
+ * - Deliberately NO password complexity validation here (unlike RegisterRequest)
+ * - Password policy is enforced once at registration time only
+ * - At login, a wrong password should fail authentication generically
+ * - Validating complexity here would allow attackers to distinguish "malformed" from "wrong"
+ * - Rejecting legitimate old passwords if policy tightens later would cause customer support issues
+ * - Password size is bounded to 128 bytes as a DoS mitigation measure (Sprint 1 has no rate-limiting)
+ * 
+ * Validation Rules:
+ * - email: Required, must be valid email format
+ * - password: Required, max 128 characters (bounded to prevent BCrypt computation abuse)
+ * 
+ * Usage Flow:
+ * 1. Client submits credentials via POST /api/auth/login
+ * 2. Spring validates constraints before controller receives the object
+ * 3. AuthService validates credentials against stored password hash
+ * 4. On success, server returns AccessToken + RefreshToken (via httpOnly cookies)
+ * 
+ * @see com.expenseTracker.model.dto.RegisterRequest
+ * @see com.expenseTracker.model.dto.AuthResponse
  */
 public class AuthRequest {
 
